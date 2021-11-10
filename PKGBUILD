@@ -29,7 +29,7 @@ prepare() {
   cd $_pkgfqn
   git revert -n 30cb2a87fcc6265232cb5a3ffce9836da6e531d6 # Revert version bump
   
-  cd "${srcdir}/${$_pkgfqn}"
+  cd "${srcdir}/${_pkgfqn}"
   patch --forward --strip=2 --input="${srcdir}/373473.patch"
 }
 
