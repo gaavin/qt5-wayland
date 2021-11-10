@@ -1,0 +1,49 @@
+diff --unified --recursive --text package.orig/qtwayland/src/client/qwaylanddisplay.cpp package.new/qtwayland/src/client/qwaylanddisplay.cpp
+--- package.orig/qtwayland/src/client/qwaylanddisplay.cpp	2021-11-10 08:57:35.102228085 -0330
++++ package.new/qtwayland/src/client/qwaylanddisplay.cpp	2021-11-10 09:05:30.016535970 -0330
+@@ -215,25 +215,37 @@
+ 
+ void QWaylandDisplay::flushRequests()
+ {
+-    if (wl_display_prepare_read(mDisplay) == 0) {
++    // first dispatch any pending events on the default queue
++    while (wl_display_prepare_read(mDisplay) != 0) {
++        wl_display_dispatch_pending(mDisplay);
++    }
++    wl_display_flush(mDisplay);
++    
++    // then check if there are any new events waiting to be read
++    struct pollfd pfd;
++    pfd.fd = wl_display_get_fd(mDisplay);
++    pfd.events = POLLIN;
++    int ret = poll(&pfd, 1, 0);
++    if (ret > 0) {
++        // if yes, read them now
+         wl_display_read_events(mDisplay);
++    } else {
++        wl_display_cancel_read(mDisplay);
+     }
+-
++    
++    // finally, dispatch the default queue and all frame queues
+     if (wl_display_dispatch_pending(mDisplay) < 0)
+         checkError();
+-
++        
+     {
+         QReadLocker locker(&m_frameQueueLock);
+         for (const FrameQueue &q : mExternalQueues) {
+             QMutexLocker locker(q.mutex);
+-            while (wl_display_prepare_read_queue(mDisplay, q.queue) != 0)
+-                wl_display_dispatch_queue_pending(mDisplay, q.queue);
+-            wl_display_read_events(mDisplay);
++	
+             wl_display_dispatch_queue_pending(mDisplay, q.queue);
+         }
+     }
+-
+-    wl_display_flush(mDisplay);
++    
+ }
+ 
+ void QWaylandDisplay::blockingReadEvents()
